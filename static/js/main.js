@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let isGenerating = false;
     let statusCheckInterval = null;
     let logHistory = [];
+    let sessionId = null;  // Store the session ID
     
     // Submit form handler
     reportForm.addEventListener('submit', function(e) {
@@ -78,6 +79,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Store session ID if provided
+                if (data.session_id) {
+                    sessionId = data.session_id;
+                    console.log('Session ID:', sessionId);
+                }
                 // Start checking status
                 startStatusCheck();
             } else {
@@ -237,5 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         progressSection.classList.add('hidden');
         resultsSection.classList.add('hidden');
         errorSection.classList.add('hidden');
+        
+        // Don't clear session ID - it should persist across UI resets
     }
 }); 

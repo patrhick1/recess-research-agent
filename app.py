@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session
 import os
 import asyncio
 import threading
 import json
 import time
+import uuid
 from datetime import datetime
 from utils import log_message
 from working_agent import (
@@ -23,18 +24,12 @@ from working_agent import (
 )
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 
 # Global variables to track report generation
 REPORTS_DIR = "reports"
-status = {
-    "is_generating": False,
-    "progress": 0,
-    "message": "",
-    "report_file": None,
-    "error": None,
-    "company_name": "",
-    "time_period": ""
-}
+# Dictionary to store status for each session
+user_status = {}
 
 # Ensure reports directory exists
 os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -68,23 +63,25 @@ async def initialize_agent() -> StateGraph:
 
     return builder.compile()
 
-async def generate_report_async(company_name, time_period):
+async def generate_report_async(company_name, time_period, session_id):
     """Generate report asynchronously using the working_agent.py code"""
-    global status
+    global user_status
     
     try:
-        status["is_generating"] = True
-        status["progress"] = 0.05
-        status["message"] = "Starting report generation..."
+        user_status[session_id]["is_generating"] = True
+        user_status[session_id]["progress"] = 0.05
+        user_status[session_id]["message"] = "Starting report generation..."
         
-        log_message(f"Starting report generation for {company_name} ({time_period})")
+        # Create a session-specific log file
+        log_file = f"logs/report_generation_{session_id}.log"
+        log_message(f"Starting report generation for {company_name} ({time_period})", log_file)
         
         # Initialize and compile the agent
-        log_message("Initializing agent")
+        log_message("Initializing agent", log_file)
         reporter_agent = await initialize_agent()
         
-        status["progress"] = 0.1
-        log_message("Agent compiled successfully")
+        user_status[session_id]["progress"] = 0.1
+        log_message("Agent compiled successfully", log_file)
         
         # Initial state
         topic = f"{company_name} {time_period} performance"
@@ -122,10 +119,12 @@ async def generate_report_async(company_name, time_period):
             }
             
             last_position = 0
-            while status["is_generating"] and status["progress"] < 1.0:
+            while (session_id in user_status and 
+                   user_status[session_id]["is_generating"] and 
+                   user_status[session_id]["progress"] < 1.0):
                 try:
                     # Read only new log entries since last check
-                    with open("logs/report_generation.log", "r") as f:
+                    with open(log_file, "r") as f:
                         f.seek(last_position)
                         new_log_content = f.read()
                         last_position = f.tell()
@@ -133,14 +132,13 @@ async def generate_report_async(company_name, time_period):
                     if new_log_content:
                         # Check each progress step in order
                         for step, progress_value in progress_steps.items():
-                            if step in new_log_content and status["progress"] < progress_value:
-                                status["progress"] = progress_value
-                                status["message"] = f"Step: {step.replace('---', '').strip()}"
-                                print(f"Progress updated to {progress_value}: {step}")
+                            if step in new_log_content and user_status[session_id]["progress"] < progress_value:
+                                user_status[session_id]["progress"] = progress_value
+                                user_status[session_id]["message"] = f"Step: {step.replace('---', '').strip()}"
+                                print(f"Progress updated to {progress_value}: {step} for session {session_id}")
                 
                 except Exception as e:
-                    print(f"Error reading log file: {e}")
-                    # If we get a socket error, it means Flask is reloading
+                    print(f"Error reading log file for session {session_id}: {e}")
                     if "socket" in str(e).lower():
                         print("Flask is reloading - stopping progress monitoring")
                         break
@@ -154,7 +152,7 @@ async def generate_report_async(company_name, time_period):
         
         # Run the report generation
         try:
-            log_message("Starting agent execution")
+            log_message("Starting agent execution", log_file)
             result = await reporter_agent.ainvoke(state)
             
             # Process result
@@ -165,49 +163,50 @@ async def generate_report_async(company_name, time_period):
                 clean_period = time_period.replace(" ", "_")
                 report_filename = f"{clean_company}_{clean_period}_market_analysis.md"
 
-            status["report_file"] = report_filename
-            log_message(f"Report generated successfully: {report_filename}")
+            user_status[session_id]["report_file"] = report_filename
+            log_message(f"Report generated successfully: {report_filename}", log_file)
             
-            # Copy the report to the reports directory with a timestamp
+            # Copy the report to the reports directory with a timestamp and session ID
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_copy = f"{REPORTS_DIR}/{timestamp}_{report_filename}"
+            report_copy = f"{REPORTS_DIR}/{timestamp}_{session_id}_{report_filename}"
             
             # Check if file exists before copying
             if os.path.exists(report_filename):
                 with open(report_filename, "r", encoding='utf-8') as src, open(report_copy, "w", encoding='utf-8') as dst:
                     dst.write(src.read())
-                status["report_file"] = report_copy
-                status["progress"] = 1.0
-                status["message"] = "Report generation complete"
+                user_status[session_id]["report_file"] = report_copy
+                user_status[session_id]["progress"] = 1.0
+                user_status[session_id]["message"] = "Report generation complete"
             else:
                 error_msg = f"Report file not found: {report_filename}"
-                log_message(error_msg)
-                status["error"] = error_msg
-                status["progress"] = 1.0
-                status["message"] = "Report generation failed - file not found"
+                log_message(error_msg, log_file)
+                user_status[session_id]["error"] = error_msg
+                user_status[session_id]["progress"] = 1.0
+                user_status[session_id]["message"] = "Report generation failed - file not found"
             
             return True
             
         except Exception as e:
             error_msg = f"Error during agent execution: {str(e)}"
-            log_message(error_msg)
-            status["error"] = error_msg
+            log_message(error_msg, log_file)
+            user_status[session_id]["error"] = error_msg
             return False
             
     except Exception as e:
         error_msg = f"Error setting up report generation: {str(e)}"
-        log_message(error_msg)
-        status["error"] = error_msg
+        log_message(error_msg, log_file if 'log_file' in locals() else None)
+        user_status[session_id]["error"] = error_msg
         return False
     finally:
-        status["is_generating"] = False
+        if session_id in user_status:
+            user_status[session_id]["is_generating"] = False
 
-def start_report_generation(company_name, time_period):
+def start_report_generation(company_name, time_period, session_id):
     """Start the report generation process in a background thread"""
-    global status
+    global user_status
     
-    # Reset status
-    status = {
+    # Initialize session status
+    user_status[session_id] = {
         "is_generating": True,
         "progress": 0,
         "message": "Initializing...",
@@ -217,23 +216,27 @@ def start_report_generation(company_name, time_period):
         "time_period": time_period
     }
     
+    # Create a session-specific log file
+    log_file = f"logs/report_generation_{session_id}.log"
+    
     # Clear the log file before starting a new report
     try:
-        with open("logs/report_generation.log", "w", encoding='utf-8') as f:
+        with open(log_file, "w", encoding='utf-8') as f:
             f.write("")
     except Exception as e:
-        print(f"Error clearing log file: {e}")
+        print(f"Error clearing log file for session {session_id}: {e}")
     
     # Define a wrapper function to run the async function
     def run_async_report():
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(generate_report_async(company_name, time_period))
+            loop.run_until_complete(generate_report_async(company_name, time_period, session_id))
         except Exception as e:
-            print(f"Error in report generation thread: {e}")
-            status["error"] = str(e)
-            status["is_generating"] = False
+            print(f"Error in report generation thread for session {session_id}: {e}")
+            if session_id in user_status:
+                user_status[session_id]["error"] = str(e)
+                user_status[session_id]["is_generating"] = False
         finally:
             loop.close()
     
@@ -247,6 +250,10 @@ def start_report_generation(company_name, time_period):
 @app.route('/')
 def index():
     """Render the main page"""
+    # Create a session ID if not exists
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+    
     return render_template('index.html')
 
 @app.route('/generate', methods=['POST'])
@@ -261,23 +268,44 @@ def generate():
             "message": "Please provide both company name and time period"
         }), 400
     
+    # Get or create session ID
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+    
+    session_id = session['session_id']
+    
     # Start report generation
-    success = start_report_generation(company_name, time_period)
+    success = start_report_generation(company_name, time_period, session_id)
     
     return jsonify({
         "success": success,
-        "message": "Report generation started"
+        "message": "Report generation started",
+        "session_id": session_id
     })
 
 @app.route('/status')
 def get_status():
-    """Get the current status of report generation"""
-    return jsonify(status)
+    """Get the current status of report generation for the session"""
+    # Get session ID
+    session_id = session.get('session_id')
+    
+    if not session_id or session_id not in user_status:
+        return jsonify({
+            "is_generating": False,
+            "progress": 0,
+            "message": "No active report generation",
+            "report_file": None,
+            "error": None,
+            "company_name": "",
+            "time_period": ""
+        })
+    
+    return jsonify(user_status[session_id])
 
 @app.route('/download/<path:filename>')
 def download_report(filename):
     """Download the generated report"""
-    global status  # Move global declaration to the top
+    session_id = session.get('session_id', '')
     
     # Check if the file path is absolute or relative
     if os.path.isabs(filename):
@@ -286,31 +314,9 @@ def download_report(filename):
         file_path = os.path.join(os.getcwd(), filename)
     
     if os.path.exists(file_path):
-        # Reset the status and clear the log file after successful download
-        status = {
-            "is_generating": False,
-            "progress": 0,
-            "message": "",
-            "report_file": None,
-            "error": None,
-            "company_name": "",
-            "time_period": ""
-        }
-        
-        # Clear the log file
-        try:
-            with open("logs/report_generation.log", "w") as f:
-                f.write("")
-        except Exception as e:
-            print(f"Error clearing log file: {e}")
-        
-        return send_file(file_path, as_attachment=True)
-    else:
-        # Try looking in the reports directory if not found
-        reports_path = os.path.join(os.getcwd(), REPORTS_DIR, os.path.basename(filename))
-        if os.path.exists(reports_path):
-            # Reset the status and clear the log file after successful download
-            status = {
+        # Reset the status after successful download
+        if session_id in user_status:
+            user_status[session_id] = {
                 "is_generating": False,
                 "progress": 0,
                 "message": "",
@@ -319,13 +325,41 @@ def download_report(filename):
                 "company_name": "",
                 "time_period": ""
             }
-            
-            # Clear the log file
-            try:
-                with open("logs/report_generation.log", "w") as f:
+        
+        # Clear the session-specific log file
+        try:
+            log_file = f"logs/report_generation_{session_id}.log"
+            if os.path.exists(log_file):
+                with open(log_file, "w", encoding='utf-8') as f:
                     f.write("")
+        except Exception as e:
+            print(f"Error clearing log file for session {session_id}: {e}")
+        
+        return send_file(file_path, as_attachment=True)
+    else:
+        # Try looking in the reports directory if not found
+        reports_path = os.path.join(os.getcwd(), REPORTS_DIR, os.path.basename(filename))
+        if os.path.exists(reports_path):
+            # Reset the status after successful download
+            if session_id in user_status:
+                user_status[session_id] = {
+                    "is_generating": False,
+                    "progress": 0,
+                    "message": "",
+                    "report_file": None,
+                    "error": None,
+                    "company_name": "",
+                    "time_period": ""
+                }
+            
+            # Clear the session-specific log file
+            try:
+                log_file = f"logs/report_generation_{session_id}.log"
+                if os.path.exists(log_file):
+                    with open(log_file, "w", encoding='utf-8') as f:
+                        f.write("")
             except Exception as e:
-                print(f"Error clearing log file: {e}")
+                print(f"Error clearing log file for session {session_id}: {e}")
             
             return send_file(reports_path, as_attachment=True)
         
@@ -335,4 +369,7 @@ def download_report(filename):
         }), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+    # Get port from environment variable for Replit compatibility
+    port = int(os.environ.get('PORT', 5000))
+    # Run with host='0.0.0.0' for Replit
+    app.run(host='0.0.0.0', debug=True, port=port) 
