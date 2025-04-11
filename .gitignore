@@ -25,6 +25,13 @@ logs/
 *.md
 !README.md
 !LICENSE.md
+!run.sh
+!.replit
+!replit.nix
+
+# Make sure prompts directory is not ignored
+!prompts/
+!prompts/*.txt
 
 # Jupyter Notebook
 .ipynb_checkpoints

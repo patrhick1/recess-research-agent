@@ -1,0 +1,75 @@
+# Section: Financial Performance
+Research: Yes
+Description: Analyze {Company Name}'s revenue growth, profitability, margins, marketing spend, and key drivers/headwinds in the U.S. market. Include total and brand-level data if possible.
+## Subsection: Revenue Growth & Volume/Mix
+## Subsection: Profitability & Margins
+## Subsection: Marketing & Promotional Spend
+## Subsection: Key Drivers & Headwinds
+
+# Section: U.S. Market & Regional Insights
+Research: Yes
+Description: Detail U.S. market performance (retail vs. foodservice), regional challenges, struggling brands/segments, and opportunities related to out-of-home consumption for {Company Name}.
+## Subsection: U.S. Market Performance
+## Subsection: Regional Challenges & Responses
+## Subsection: Struggling Brands or Segments
+## Subsection: Out-of-Home Consumption
+
+# Section: Product Category Analysis
+Research: Yes
+Description: Examine {Company Name}'s specific product categories including high-growth and underperforming categories, {Company Name}'s market share within each category vs. competitors (Chobani, General Mills, Pepsi, etc.), and emerging product innovation trends. Focus on {Company Name}'s core product lines and their performance.
+## Subsection: High-Growth Categories
+## Subsection: Category-Level Market Share
+## Subsection: Underperforming Categories
+## Subsection: Emerging Trends
+
+# Section: Marketing Strategy & Consumer Targeting
+Research: Yes
+Description: Analyze {Company Name}'s marketing spend trends, target consumer segments, identify insights relevant to Recess sampling, and include direct executive quotes on winning consumers.
+## Subsection: Marketing Spend Trends
+## Subsection: Consumer Segments
+## Subsection: Insights Relevant to Recess
+## Subsection: Direct Quotes
+
+# Section: Brand Portfolio Analysis
+Research: Yes
+Description: Provide details on all major brands owned by {Company Name} in the U.S. market: revenue/growth, target audience/positioning, marketing strategy (especially regarding sampling), and a SWOT analysis if possible.
+## Subsection: Brand Portfolio Overview
+## Subsection: Brand-Level Revenues & Growth
+## Subsection: Target Audience & Positioning
+## Subsection: Marketing Strategy & Sampling Focus
+## Subsection: SWOT Analysis (U.S. Market)
+
+# Section: Strategic Product Innovation & Acquisitions
+Research: Yes
+Description: Cover {Company Name}'s new product launches, brand renovations, potential M&A activity, and focus on functional/better-for-you products.
+## Subsection: New Product Launches
+## Subsection: Brand Renovations & Reformulations
+## Subsection: Potential Acquisitions or Divestitures
+## Subsection: Functional/Better-for-You Focus
+
+# Section: Retail Channel Performance
+Research: Yes
+Description: Analyze {Company Name}'s performance across top retailers (Walmart, Target, Amazon, etc.), retail media spend, e-commerce vs. in-store dynamics, wholesale/club/convenience channels, with emphasis on Dollar General & Walmart partnerships.
+## Subsection: Top-Performing Retailers
+## Subsection: Retail Media Spend
+## Subsection: E-Commerce vs. In-Store
+## Subsection: Wholesale/Club/Convenience
+## Subsection: Dollar General & Walmart Focus
+
+# Section: Competitive Benchmarking & Market Share 
+Research: Yes
+Description: Provide a direct one-to-one comparison between {Company Name} and its competitors across all major product categories, analyzing market share percentages and growth trends for each competitor within their respective categories.
+## Subsection: Market Share Analysis
+## Subsection: Competitive Advantages
+## Subsection: Competitive Threats
+## Subsection: Industry Positioning
+## Subsection: Implications for Recess
+
+# Section: Actionable Recommendations for Recess
+Research: No
+Description: Synthesize findings from previous sections to suggest specific sampling/activation opportunities, audience/channel recommendations leveraging Recess's network, retailer-audience alignment (esp. Dollar General/Walmart), scaling tactics, and how Recess meets {Company Name}'s goals.
+## Subsection: Sampling & Activation Opportunities
+## Subsection: Audience & Channel Recommendations
+## Subsection: Retailer-Audience Alignment
+## Subsection: Scaling Tactics
+## Subsection: Tie-Ins to Company Goals

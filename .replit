@@ -1,0 +1,33 @@
+run = "python app.py"
+entrypoint = "app.py"
+
+# Language configuration
+language = "python3"
+
+# Environment variables
+[env]
+PYTHONPATH = "/home/runner/${REPL_SLUG}"
+
+# Packaging configuration
+[packager]
+language = "python3"
+ignoredPackages = ["unit_tests"]
+
+[packager.features]
+enabledForHosting = true
+packageSearch = true
+guessImports = true
+
+# UPM package manager configuration
+[languages.python3.languageServer]
+start = "pylsp"
+
+[unitTest]
+language = "python3"
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+run = ["sh", "-c", "python app.py"]
+deploymentTarget = "cloudrun" 
