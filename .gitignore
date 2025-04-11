@@ -29,6 +29,7 @@ logs/
 !.replit
 !replit.nix
 !Deep_Researcher_Technical_Documentation.md
+!API_DOCUMENTATION.md
 
 # Make sure prompts directory is not ignored
 !prompts/
