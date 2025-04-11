@@ -28,6 +28,7 @@ logs/
 !run.sh
 !.replit
 !replit.nix
+!Deep_Researcher_Technical_Documentation.md
 
 # Make sure prompts directory is not ignored
 !prompts/
