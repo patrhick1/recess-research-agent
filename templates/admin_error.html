@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Deep Researcher Admin</h1>
+        
+        <div class="card">
+            <h2>Error</h2>
+            
+            <div class="error-message">
+                {{ message }}
+            </div>
+            
+            <div class="form-actions">
+                <a href="/admin/dashboard" class="btn-primary">Return to Dashboard</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <a href="/">Return to Main Page</a>
+        </div>
+    </div>
+</body>
+</html> 

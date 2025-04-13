@@ -3,14 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deep Researcher - Market Analysis Tool</title>
+    <title>Deep Researcher - Report Generation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .admin-link {
+            font-size: 0.8em;
+            color: #888;
+            text-decoration: none;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        .admin-link:hover {
+            text-decoration: underline;
+        }
+        .nav-link {
+            color: #4a90e2;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 15px;
+            transition: color 0.3s;
+        }
+        .nav-link:hover {
+            color: #3a7bc8;
+            text-decoration: underline;
+        }
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+        .return-dashboard {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .return-dashboard:hover {
+            background-color: #3a7bc8;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Deep Researcher</h1>
+            <div class="header-actions">
+                <h1>Deep Researcher</h1>
+                <a href="/admin/dashboard" class="return-dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Return to Dashboard
+                </a>
+            </div>
             <h2>Market Performance Analysis Tool</h2>
         </header>
 
@@ -105,6 +152,7 @@
         <footer>
             <p>Deep Researcher - Market Analysis Tool v1.0</p>
             <p class="footnote">Reports are automatically deleted after one week for security purposes.</p>
+            <a href="/admin/dashboard" class="admin-link">Admin Dashboard</a>
         </footer>
     </div>
 

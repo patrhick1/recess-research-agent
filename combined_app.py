@@ -6,15 +6,17 @@ import time
 import uuid
 from datetime import datetime, timedelta
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Response, Depends
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, Union
 from utils import log_message
 from starlette.middleware.wsgi import WSGIMiddleware
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import sys
 import glob
 
@@ -56,6 +58,20 @@ os.makedirs(REPORTS_DIR, exist_ok=True)
 
 # Create log file directory
 os.makedirs("logs", exist_ok=True)
+
+# Admin credentials - Store these securely in environment variables in production
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH', 
+                                    generate_password_hash('change_this_password_immediately'))
+
+# Admin authentication decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'admin_authenticated' not in session or not session['admin_authenticated']:
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # FastAPI models
 class ReportRequest(BaseModel):
@@ -342,7 +358,7 @@ def start_report_generation(company_name, time_period, session_id):
     """Start the report generation process in a background thread"""
     global user_status
     
-    # Initialize session status
+    # Initialize session status with creation timestamp
     user_status[session_id] = {
         "is_generating": True,
         "progress": 0,
@@ -350,7 +366,9 @@ def start_report_generation(company_name, time_period, session_id):
         "report_file": None,
         "error": None,
         "company_name": company_name,
-        "time_period": time_period
+        "time_period": time_period,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "generating"
     }
     
     # Create a session-specific log file
@@ -387,7 +405,13 @@ def start_report_generation(company_name, time_period, session_id):
 # Flask routes
 @flask_app.route('/')
 def index():
-    """Render the main page"""
+    """Redirect to admin login page"""
+    return redirect(url_for('admin_login'))
+
+@flask_app.route('/generate-report')
+@admin_required
+def generate_report_page():
+    """Render the report generation page"""
     # Create a session ID if not exists
     if 'session_id' not in session:
         session['session_id'] = str(uuid.uuid4())
@@ -395,6 +419,7 @@ def index():
     return render_template('index.html')
 
 @flask_app.route('/generate', methods=['POST'])
+@admin_required
 def generate():
     """Start generating a report based on form input"""
     company_name = request.form.get('company_name', '')
@@ -426,6 +451,7 @@ def generate():
     })
 
 @flask_app.route('/status')
+@admin_required
 def get_status():
     """Get the current status of report generation for the session"""
     # Get session ID from query parameter first, then fallback to Flask session
@@ -507,6 +533,7 @@ def get_status():
     return jsonify(user_status[session_id])
 
 @flask_app.route('/download/<path:filename>')
+@admin_required
 def download_report(filename):
     """Download the generated report"""
     # Get session ID from query parameter first, then fallback to Flask session
@@ -579,6 +606,7 @@ def download_report(filename):
 
 # Add a route to cancel an ongoing report generation
 @flask_app.route('/cancel', methods=['POST'])
+@admin_required
 def cancel_report():
     """Cancel an ongoing report generation"""
     # Get session ID from query parameter first, then fallback to Flask session
@@ -631,6 +659,7 @@ def cancel_report():
 
 # Add a route to validate session IDs
 @flask_app.route('/validate-session')
+@admin_required
 def validate_session():
     """Validate a session ID and return its status"""
     session_id = request.args.get('session_id')
@@ -673,13 +702,29 @@ def validate_session():
         }
     })
 
+# FastAPI auth dependency
+async def verify_admin(request: Request):
+    """Verify the admin is authenticated for FastAPI routes"""
+    # Get session data from the WSGI session middleware
+    session_data = request.cookies.get('session')
+    if not session_data:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Check if admin_authenticated is in the session
+    # This is a simplified check since we're using Flask sessions
+    # In a real-world scenario, you would use a more robust session validation
+    if 'admin_authenticated' not in session or not session['admin_authenticated']:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    return True
+
 # FastAPI routes
 def start_report_generation_task(company_name: str, time_period: str, request_id: str):
     """Start the report generation task (for background tasks)"""
     asyncio.run(generate_report_async(company_name, time_period, request_id))
 
 @fastapi_app.post("/api/generate-report", response_model=ReportResponse)
-async def api_generate_report(report_request: ReportRequest, background_tasks: BackgroundTasks):
+async def api_generate_report(report_request: ReportRequest, background_tasks: BackgroundTasks, authenticated: bool = Depends(verify_admin)):
     """Start generating a report based on request data"""
     company_name = report_request.company_name
     time_period = report_request.time_period
@@ -698,7 +743,9 @@ async def api_generate_report(report_request: ReportRequest, background_tasks: B
         "report_file": None,
         "error": None,
         "company_name": company_name,
-        "time_period": time_period
+        "time_period": time_period,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "generating"
     }
     
     # Create a request-specific log file
@@ -721,7 +768,7 @@ async def api_generate_report(report_request: ReportRequest, background_tasks: B
     )
 
 @fastapi_app.get("/api/report-status/{request_id}", response_model=ReportStatus)
-async def api_get_report_status(request_id: str):
+async def api_get_report_status(request_id: str, authenticated: bool = Depends(verify_admin)):
     """Get the current status of report generation for the given request ID"""
     if not request_id or request_id not in user_status:
         raise HTTPException(status_code=404, detail="Report request not found")
@@ -732,7 +779,7 @@ async def api_get_report_status(request_id: str):
     )
 
 @fastapi_app.get("/api/download-report/{request_id}")
-async def api_download_report(request_id: str):
+async def api_download_report(request_id: str, authenticated: bool = Depends(verify_admin)):
     """Download the generated report"""
     if not request_id or request_id not in user_status:
         raise HTTPException(status_code=404, detail="Report request not found")
@@ -755,7 +802,7 @@ async def api_download_report(request_id: str):
     )
 
 @fastapi_app.delete("/api/report/{request_id}")
-async def api_delete_report(request_id: str):
+async def api_delete_report(request_id: str, authenticated: bool = Depends(verify_admin)):
     """Delete a report and its associated data"""
     if not request_id or request_id not in user_status:
         raise HTTPException(status_code=404, detail="Report request not found")
@@ -784,7 +831,7 @@ async def api_delete_report(request_id: str):
 
 # Add API route to cancel a report
 @fastapi_app.post("/api/cancel-report/{request_id}")
-async def api_cancel_report(request_id: str):
+async def api_cancel_report(request_id: str, authenticated: bool = Depends(verify_admin)):
     """Cancel an ongoing report generation"""
     if not request_id or request_id not in user_status:
         raise HTTPException(status_code=404, detail="Report request not found")
@@ -793,6 +840,7 @@ async def api_cancel_report(request_id: str):
     if user_status[request_id]["is_generating"]:
         user_status[request_id]["is_generating"] = False
         user_status[request_id]["message"] = "Report generation cancelled by user"
+        user_status[request_id]["status"] = "cancelled"
         
         # Update the log file
         try:
@@ -884,19 +932,238 @@ def start_cleanup_task():
 @fastapi_app.get("/api/docs", include_in_schema=False)
 async def api_docs_redirect():
     """Redirect to the API documentation"""
-    return Response(
-        status_code=307,  # Temporary redirect
-        headers={"Location": "/docs"}
-    )
+    return RedirectResponse(url="/docs")
 
 # Mount Flask app to FastAPI
 fastapi_app.mount("/", WSGIMiddleware(flask_app))
+
+# Ensure static directory exists
+static_dir = os.path.join(os.getcwd(), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir, exist_ok=True)
+    print(f"Created static directory at {static_dir}")
 
 # Serve static files
 fastapi_app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Start cleanup task on application startup
 start_cleanup_task()
+
+# Admin login route
+@flask_app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH, password):
+            session['admin_authenticated'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return render_template('admin_login.html', error="Invalid credentials")
+    
+    return render_template('admin_login.html')
+
+# Admin logout route
+@flask_app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('admin_login'))
+
+@flask_app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    # Get all sessions from user_status dictionary
+    sessions_data = []
+    
+    for session_id, status in user_status.items():
+        # Extract creation time from status if available, otherwise use "N/A"
+        created_at = status.get("created_at", "N/A")
+        
+        # Build session info
+        session_info = {
+            "session_id": session_id,
+            "title": f"{status.get('company_name', 'Unknown')} - {status.get('time_period', 'Unknown')}",
+            "created_at": created_at,
+            "status": status.get("status", "Unknown"),
+            "progress": status.get("progress", 0),
+            "report_file": status.get("report_file", None),
+            "error": status.get("error", None)
+        }
+        
+        sessions_data.append(session_info)
+    
+    # Also check report directory for session files that might not be in memory
+    report_files = glob.glob(os.path.join(REPORTS_DIR, "*"))
+    for file_path in report_files:
+        filename = os.path.basename(file_path)
+        parts = filename.split('_')
+        
+        # Expected format: YYYYMMDD_HHMMSS_session-id_company_timeperiod_market_analysis.md
+        if len(parts) > 3:
+            # Extract session ID
+            session_id = parts[2]
+            
+            # Skip if already in sessions_data
+            if any(s["session_id"] == session_id for s in sessions_data):
+                continue
+            
+            # Extract creation time from filename
+            try:
+                created_at = f"{parts[0][:4]}-{parts[0][4:6]}-{parts[0][6:]} {parts[1][:2]}:{parts[1][2:4]}:{parts[1][4:]}"
+            except:
+                created_at = "Unknown"
+            
+            # Try to extract company and time period
+            company_time = '_'.join(parts[3:]).replace('_market_analysis.md', '')
+            company_name = "Unknown"
+            time_period = "Unknown"
+            
+            if '_' in company_time:
+                company_parts = company_time.split('_')
+                company_name = ' '.join(company_parts[:-1]).replace('_', ' ')
+                time_period = company_parts[-1].replace('_', ' ')
+            
+            # Add to sessions_data
+            sessions_data.append({
+                "session_id": session_id,
+                "title": f"{company_name} - {time_period}",
+                "created_at": created_at,
+                "status": "completed",
+                "progress": 1.0,
+                "report_file": file_path,
+                "error": None
+            })
+    
+    # Sort by creation time (newest first)
+    sessions_data.sort(key=lambda x: x["created_at"] if x["created_at"] != "N/A" else "", reverse=True)
+    
+    return render_template('admin_dashboard.html', sessions=sessions_data)
+
+@flask_app.route('/admin/session/<session_id>')
+@admin_required
+def admin_view_session(session_id):
+    # Get session info
+    if session_id in user_status:
+        session_info = user_status[session_id]
+        
+        # Check if there's a log file
+        log_file = f"logs/report_generation_{session_id}.log"
+        log_content = ""
+        
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, "r", encoding='utf-8') as f:
+                    log_content = f.read()
+            except Exception as e:
+                log_content = f"Error reading log file: {str(e)}"
+        
+        return render_template('admin_session.html', 
+                               session_id=session_id, 
+                               session_info=session_info,
+                               log_content=log_content)
+    else:
+        # Check if there's a report file for this session
+        report_files = glob.glob(os.path.join(REPORTS_DIR, f"*_{session_id}_*"))
+        
+        if report_files:
+            # Found a report file
+            file_path = max(report_files, key=os.path.getmtime)
+            filename = os.path.basename(file_path)
+            parts = filename.split('_')
+            
+            # Build session info
+            created_at = "Unknown"
+            company_name = "Unknown"
+            time_period = "Unknown"
+            
+            try:
+                created_at = f"{parts[0][:4]}-{parts[0][4:6]}-{parts[0][6:]} {parts[1][:2]}:{parts[1][2:4]}:{parts[1][4:]}"
+            except:
+                pass
+            
+            # Try to extract company and time period
+            if len(parts) > 3:
+                company_time = '_'.join(parts[3:]).replace('_market_analysis.md', '')
+                if '_' in company_time:
+                    company_parts = company_time.split('_')
+                    company_name = ' '.join(company_parts[:-1]).replace('_', ' ')
+                    time_period = company_parts[-1].replace('_', ' ')
+            
+            session_info = {
+                "company_name": company_name,
+                "time_period": time_period,
+                "created_at": created_at,
+                "status": "completed",
+                "progress": 1.0,
+                "report_file": file_path,
+                "error": None
+            }
+            
+            return render_template('admin_session.html', 
+                                  session_id=session_id, 
+                                  session_info=session_info,
+                                  log_content="Log file not available.")
+        
+        return render_template('admin_error.html', 
+                              message=f"Session {session_id} not found")
+
+@flask_app.route('/admin/delete/<session_id>', methods=['POST'])
+@admin_required
+def admin_delete_session(session_id):
+    # Delete session data, report file, and log file
+    if session_id in user_status:
+        # Get report file path
+        report_file = user_status[session_id].get("report_file")
+        
+        # Delete report file if exists
+        if report_file and os.path.exists(report_file):
+            try:
+                os.remove(report_file)
+            except Exception as e:
+                print(f"Error deleting report file: {e}")
+        
+        # Delete from user_status
+        user_status.pop(session_id)
+    
+    # Check for report files in reports directory
+    report_files = glob.glob(os.path.join(REPORTS_DIR, f"*_{session_id}_*"))
+    for file_path in report_files:
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"Error deleting report file: {e}")
+    
+    # Delete log file
+    log_file = f"logs/report_generation_{session_id}.log"
+    if os.path.exists(log_file):
+        try:
+            os.remove(log_file)
+        except Exception as e:
+            print(f"Error deleting log file: {e}")
+    
+    return redirect(url_for('admin_dashboard'))
+
+@flask_app.route('/admin/log/<session_id>')
+@admin_required
+def admin_get_log(session_id):
+    """Get the log file content for a session"""
+    log_file = f"logs/report_generation_{session_id}.log"
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r", encoding='utf-8') as f:
+                log_content = f.read()
+            return log_content
+        except Exception as e:
+            return f"Error reading log file: {str(e)}"
+    else:
+        return "Log file not found"
+
+# Add a root route for FastAPI to redirect to admin login
+@fastapi_app.get("/api", include_in_schema=False)
+async def api_root():
+    """Redirect to admin login"""
+    return RedirectResponse(url="/admin/login")
 
 if __name__ == "__main__":
     # Get port from environment variable for Replit compatibility
