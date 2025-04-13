@@ -26,14 +26,17 @@ logs/
 !README.md
 !LICENSE.md
 !run.sh
-!.replit
-!replit.nix
 !Deep_Researcher_Technical_Documentation.md
 !API_DOCUMENTATION.md
+!API_USAGE_EXAMPLES.md
+!API_README.md
 
 # Make sure prompts directory is not ignored
 !prompts/
 !prompts/*.txt
+
+# Make sure API example scripts are not ignored
+!example_api_usage.py
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -59,3 +62,14 @@ service-account-key.json
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Add test_api.ps1 to gitignore
+test_api.ps1
+
+# Replit specific files
+.replit
+replit.nix
+.breakpoints
+.config/
+.cache/
+.upm/

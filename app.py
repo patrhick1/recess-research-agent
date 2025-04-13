@@ -153,7 +153,21 @@ async def generate_report_async(company_name, time_period, session_id):
         # Run the report generation
         try:
             log_message("Starting agent execution", log_file)
-            result = await reporter_agent.ainvoke(state)
+            log_message(f"Initial state: {json.dumps(state, indent=2)}", log_file)
+            
+            try:
+                log_message("Calling reporter_agent.ainvoke with state", log_file)
+                result = await reporter_agent.ainvoke(state)
+                log_message(f"Agent execution completed, result received: {json.dumps(result, indent=2)[:500]}...", log_file)
+            except Exception as agent_exec_error:
+                import traceback
+                error_trace = traceback.format_exc()
+                log_message(f"CRITICAL ERROR during agent.ainvoke: {str(agent_exec_error)}", log_file)
+                log_message(f"Error trace: {error_trace}", log_file)
+                user_status[session_id]["error"] = f"Agent execution error: {str(agent_exec_error)}"
+                user_status[session_id]["progress"] = 1.0
+                user_status[session_id]["message"] = "Report generation failed - execution error"
+                return False
             
             # Process result
             report_filename = result.get("filename", "")
@@ -162,6 +176,7 @@ async def generate_report_async(company_name, time_period, session_id):
                 clean_company = company_name.replace(" ", "_")
                 clean_period = time_period.replace(" ", "_")
                 report_filename = f"{clean_company}_{clean_period}_market_analysis.md"
+                log_message(f"Filename not found in result, using generated filename: {report_filename}", log_file)
 
             user_status[session_id]["report_file"] = report_filename
             log_message(f"Report generated successfully: {report_filename}", log_file)
@@ -169,17 +184,21 @@ async def generate_report_async(company_name, time_period, session_id):
             # Copy the report to the reports directory with a timestamp and session ID
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             report_copy = f"{REPORTS_DIR}/{timestamp}_{session_id}_{report_filename}"
+            log_message(f"Copying report to: {report_copy}", log_file)
             
             # Check if file exists before copying
             if os.path.exists(report_filename):
                 with open(report_filename, "r", encoding='utf-8') as src, open(report_copy, "w", encoding='utf-8') as dst:
-                    dst.write(src.read())
+                    content = src.read()
+                    dst.write(content)
+                    log_message(f"Report copied successfully, {len(content)} characters", log_file)
                 user_status[session_id]["report_file"] = report_copy
                 user_status[session_id]["progress"] = 1.0
                 user_status[session_id]["message"] = "Report generation complete"
             else:
                 error_msg = f"Report file not found: {report_filename}"
                 log_message(error_msg, log_file)
+                log_message(f"Current directory contents: {os.listdir('.')}", log_file)
                 user_status[session_id]["error"] = error_msg
                 user_status[session_id]["progress"] = 1.0
                 user_status[session_id]["message"] = "Report generation failed - file not found"
@@ -187,15 +206,25 @@ async def generate_report_async(company_name, time_period, session_id):
             return True
             
         except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
             error_msg = f"Error during agent execution: {str(e)}"
             log_message(error_msg, log_file)
+            log_message(f"Error trace: {error_trace}", log_file)
             user_status[session_id]["error"] = error_msg
+            user_status[session_id]["progress"] = 1.0
+            user_status[session_id]["message"] = "Report generation failed - execution error"
             return False
             
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         error_msg = f"Error setting up report generation: {str(e)}"
         log_message(error_msg, log_file if 'log_file' in locals() else None)
+        log_message(f"Error trace: {error_trace}", log_file if 'log_file' in locals() else None)
         user_status[session_id]["error"] = error_msg
+        user_status[session_id]["progress"] = 1.0
+        user_status[session_id]["message"] = "Report generation failed - setup error"
         return False
     finally:
         if session_id in user_status:

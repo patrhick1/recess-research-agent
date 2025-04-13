@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from typing import Annotated, List, Optional, Literal, Union, Dict, Any, get_type_hints, get_origin, get_args
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
-from utils import log_message
+from utils import log_message as original_log_message
 import operator
 import json
 
@@ -37,6 +37,20 @@ OPENAI_KEY = os.getenv("OPENAI_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Global variable for log file path
+CURRENT_LOG_FILE = None
+
+def set_log_file(log_file_path):
+    """Set the global log file path for this module"""
+    global CURRENT_LOG_FILE
+    CURRENT_LOG_FILE = log_file_path
+    original_log_message(f"Set log file to: {log_file_path}", CURRENT_LOG_FILE)
+
+# Wrapper for log_message that uses the current log file
+def log_message(message):
+    """Log a message using the current log file"""
+    original_log_message(message, CURRENT_LOG_FILE)
 
 #############################################
 # DATA MODELS

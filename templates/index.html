@@ -15,6 +15,29 @@
         </header>
 
         <main>
+            <section id="session-info" class="card">
+                <div class="session-container">
+                    <div class="session-text">
+                        <h3>Your Session ID: <span id="session-id-display">Loading...</span></h3>
+                        <p class="help-text">Save this ID to retrieve your report later if you close your browser.</p>
+                    </div>
+                    <div class="session-actions">
+                        <button id="copy-session-btn" class="btn-secondary btn-small" title="Copy to clipboard">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                <div id="restore-session-container">
+                    <div class="form-group">
+                        <label for="restore-session-id">Restore Previous Session</label>
+                        <div class="restore-input-group">
+                            <input type="text" id="restore-session-id" placeholder="Enter your previous session ID">
+                            <button id="restore-btn" class="btn-primary">Restore</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="input-section" class="card">
                 <h2>Generate Market Analysis Report</h2>
                 <form id="report-form">
@@ -81,6 +104,7 @@
 
         <footer>
             <p>Deep Researcher - Market Analysis Tool v1.0</p>
+            <p class="footnote">Reports are automatically deleted after one week for security purposes.</p>
         </footer>
     </div>
 

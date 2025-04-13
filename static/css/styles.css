@@ -203,27 +203,77 @@ input[type="text"]:focus {
     white-space: pre-wrap;
 }
 
+/* Session ID section */
+.session-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.session-text h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+#session-id-display {
+    font-family: monospace;
+    padding: 0.25rem 0.5rem;
+    background-color: #F3F4F6;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.btn-small {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.restore-input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.restore-input-group input {
+    flex-grow: 1;
+}
+
+.restore-input-group button {
+    white-space: nowrap;
+}
+
+.footnote {
+    font-size: 0.8rem;
+    color: var(--secondary-color);
+    text-align: center;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
 /* Utility classes */
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 /* Footer */
 footer {
     text-align: center;
-    padding-top: 2rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
     color: var(--secondary-color);
-    font-size: 0.9rem;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .container {
-        padding: 1rem;
+        padding: 1rem 0.5rem;
     }
     
     .card {
-        padding: 1.5rem;
+        padding: 1.5rem 1rem;
     }
     
     .actions-container {
@@ -234,5 +284,23 @@ footer {
     .btn-primary, .btn-secondary {
         width: 100%;
         text-align: center;
+    }
+
+    .session-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .session-actions {
+        margin-top: 0.5rem;
+        width: 100%;
+    }
+
+    .session-actions button {
+        width: 100%;
+    }
+
+    .restore-input-group {
+        flex-direction: column;
     }
 } 
